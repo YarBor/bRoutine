@@ -9,6 +9,7 @@ bRoutineEnv::TaskDistributor_t* bRoutineEnv::TaskDistributor_t::New(int size)
     bRoutineEnv::TaskDistributor_t* i = (bRoutineEnv::TaskDistributor_t*)calloc(1, sizeof(bRoutineEnv::TaskDistributor_t));
     i->ActiveTasks = (TaskItemsList**)calloc(size, sizeof(TaskItemsList*));
     i->schedulers = (bScheduler**)calloc(size, sizeof(bScheduler*));
+    // 在 registe 的时候增长
     i->size = 0;
     return i;
 }
@@ -41,9 +42,8 @@ struct bRoutine* bRoutineEnv::bRoutinePool_t::pop()
 {
     bRoutine* i = nullptr;
     pthread_mutex_lock(&this->mutex);
-    if (!this->DoneRoutines.empty()) {
-        i = this->DoneRoutines.front();
-        this->DoneRoutines.pop_front();
+    if (this->DoneRoutines.size() != 0) {
+        i = this->DoneRoutines.pop();
     }
     pthread_mutex_unlock(&this->mutex);
     return i;
@@ -51,7 +51,7 @@ struct bRoutine* bRoutineEnv::bRoutinePool_t::pop()
 void bRoutineEnv::bRoutinePool_t::push(bRoutine* r)
 {
     pthread_mutex_lock(&this->mutex);
-    this->DoneRoutines.emplace_back(r);
+    this->DoneRoutines.push(r);
     pthread_mutex_unlock(&this->mutex);
 }
 struct bRoutineStack* bRoutineEnv::bUnSharedStackPool_t::pop(int level)
@@ -60,20 +60,23 @@ struct bRoutineStack* bRoutineEnv::bUnSharedStackPool_t::pop(int level)
     switch (level) {
     case StackLevel::MiniStack:
         pthread_mutex_lock(&this->mutexMini);
-        i = this->DoneRoutinesMiniStacks.front();
-        this->DoneRoutinesMiniStacks.pop_front();
+        if (this->DoneRoutinesMiniStacks.size() != 0) {
+            i = this->DoneRoutinesMiniStacks.pop();
+        }
         pthread_mutex_unlock(&this->mutexMini);
         break;
     case StackLevel::MediumStack:
         pthread_mutex_lock(&this->mutexMedium);
-        i = this->DoneRoutinesMediumStacks.front();
-        this->DoneRoutinesMediumStacks.pop_front();
+        if (this->DoneRoutinesMediumStacks.size() != 0) {
+            i = this->DoneRoutinesMediumStacks.pop();
+        }
         pthread_mutex_unlock(&this->mutexMedium);
         break;
     case StackLevel::LargeStack:
         pthread_mutex_lock(&this->mutexLarge);
-        i = this->DoneRoutinesLargeStacks.front();
-        this->DoneRoutinesLargeStacks.pop_front();
+        if (this->DoneRoutinesLargeStacks.size() != 0) {
+            i = this->DoneRoutinesLargeStacks.pop();
+        }
         pthread_mutex_unlock(&this->mutexLarge);
         break;
     default:
@@ -95,17 +98,17 @@ void bRoutineEnv::bUnSharedStackPool_t::push(struct bRoutineStack* bst)
     switch (bst->StackSize / 1024) {
     case bRoutineStack::LargeStackSize:
         pthread_mutex_lock(&this->mutexLarge);
-        this->DoneRoutinesMiniStacks.push_back(bst);
+        this->DoneRoutinesMiniStacks.push(bst);
         pthread_mutex_unlock(&this->mutexLarge);
         break;
     case bRoutineStack::MediumStackSize:
         pthread_mutex_lock(&this->mutexMedium);
-        this->DoneRoutinesMediumStacks.push_back(bst);
+        this->DoneRoutinesMediumStacks.push(bst);
         pthread_mutex_unlock(&this->mutexMedium);
         break;
     case bRoutineStack::MiniStackSize:
         pthread_mutex_lock(&this->mutexMini);
-        this->DoneRoutinesMiniStacks.push_back(bst);
+        this->DoneRoutinesMiniStacks.push(bst);
         pthread_mutex_unlock(&this->mutexMini);
         break;
     default:
@@ -114,32 +117,33 @@ void bRoutineEnv::bUnSharedStackPool_t::push(struct bRoutineStack* bst)
 }
 
 static bRoutineEnv* __bRoutineEnv = 0;
-static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
 #define defaultProcess 1
 
 struct bRoutineEnv* InitializeBRoutineEnv(int RunProcessNums)
 {
-    if (__bRoutineEnv)
-        return __bRoutineEnv;
-    __bRoutineEnv = (bRoutineEnv*)calloc(1, sizeof(struct bRoutineEnv));
-    __bRoutineEnv->TaskDistributor = bRoutineEnv::TaskDistributor_t::New(RunProcessNums);
-    __bRoutineEnv->TaskDistributor->size = RunProcessNums;
-    // __bRoutineEnv->ActiveTasks = TaskItemsList::New();
-    __bRoutineEnv->RoutinePool = bRoutineEnv::bRoutinePool_t::New();
-    __bRoutineEnv->UnSharedStackPool = bRoutineEnv::bUnSharedStackPool_t::New();
-    __bRoutineEnv->Epoll = bEpoll::New();
-    //   __bRoutineEnv->schedulers = (decltype(__bRoutineEnv->schedulers))calloc(
-    //   __bRoutineEnv->runingProgressNum, sizeof(bScheduler *));
+    bRoutineEnv* New__bRoutineEnv = NULL;
+    if (New__bRoutineEnv)
+        return New__bRoutineEnv;
+    New__bRoutineEnv = (bRoutineEnv*)calloc(1, sizeof(struct bRoutineEnv));
+    New__bRoutineEnv->TaskDistributor = bRoutineEnv::TaskDistributor_t::New(RunProcessNums);
+    // New__bRoutineEnv->TaskDistributor->size = RunProcessNums;
+    // New__bRoutineEnv->ActiveTasks = TaskItemsList::New();
+    New__bRoutineEnv->RoutinePool = bRoutineEnv::bRoutinePool_t::New();
+    New__bRoutineEnv->UnSharedStackPool = bRoutineEnv::bUnSharedStackPool_t::New();
+    New__bRoutineEnv->Epoll = bEpoll::New();
+    //   New__bRoutineEnv->schedulers = (decltype(New__bRoutineEnv->schedulers))calloc(
+    //   New__bRoutineEnv->runingProgressNum, sizeof(bScheduler *));
 
-    return __bRoutineEnv;
+    return New__bRoutineEnv;
 }
 
 void* ProcessBegin(void* i);
 
-void CreatMutProcessEnv()
+void CreatMutProcessEnv(bRoutineEnv* New__bRoutineEnv)
 {
     bScheduler* thisSch = bScheduler::get();
-    __bRoutineEnv->TaskDistributor->schedulers[0] = thisSch;
+
+    // New__bRoutineEnv->TaskDistributor->schedulers[0] = thisSch;
     // 挂起主线程
     auto threadArg = (threadArgs*)calloc(1, sizeof(threadArgs));
     bRoutine* mainR = bRoutine::New(StackLevel::LargeStack, ProcessBegin, threadArg);
@@ -148,7 +152,7 @@ void CreatMutProcessEnv()
     thisSch->occupyRoutine->IsMain = true;
     thisSch->SwapContext();
     // 切换上下文
-    for (int i = 1; i < __bRoutineEnv->TaskDistributor->size; ++i) {
+    for (int i = 1; i < New__bRoutineEnv->TaskDistributor->size; ++i) {
         auto threadArg = (threadArgs*)calloc(1, sizeof(threadArgs));
         pthread_create(&threadArg->thread, NULL, ProcessBegin, threadArg);
         // 起物理线程
@@ -158,10 +162,12 @@ void CreatMutProcessEnv()
 struct bRoutineEnv* bRoutineEnv::init(uint RunProcessNums)
 {
     if (__bRoutineEnv == NULL) {
+        static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
         pthread_mutex_lock(&lock);
         if (__bRoutineEnv == NULL) {
-            InitializeBRoutineEnv(RunProcessNums);
-            CreatMutProcessEnv();
+            __bRoutineEnv = InitializeBRoutineEnv(RunProcessNums);
+            CreatMutProcessEnv(__bRoutineEnv);
+            // __bRoutineEnv = New__bRoutineEnv;
         }
         pthread_mutex_unlock(&lock);
     }
@@ -291,4 +297,5 @@ struct TaskItem* bRoutineEnv::stealTaskRoutine(bScheduler* sch)
         if (p)
             sch->ActivetaskItems->pushBack(p);
     }
+    return sch->ActivetaskItems->popHead();
 }

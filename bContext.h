@@ -50,9 +50,9 @@ struct bContext {
     size_t stackSize;
     // 栈的起始地址
     char* stackPtr;
-    static inline bContext* New();
-    inline bContext* init(bRoutineStack*);
-    static inline void Del(bContext*);
+    static  bContext* New();
+    bContext* init(struct bRoutine*, bRoutineStack*);
+    static  void Del(bContext*);
     //   int initContext(RoutineFunc *func, void *arg);
 }; // 128
 

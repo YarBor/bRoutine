@@ -1,8 +1,6 @@
 #include "bStack.h"
 
 #include <stddef.h>
-#include <sys/mman.h>
-#include <unistd.h>
 
 #include <iostream>
 using Stack = struct bRoutineStack;
@@ -42,8 +40,4 @@ struct bRoutineStack* bRoutineStack::New(int sizeLevel)
     return ret;
 }
 
-uint bRoutineStack::GetPageSize_b()
-{
-    static uint pageSize = getpagesize();
-    return pageSize;
-}
+ 

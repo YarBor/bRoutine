@@ -11,6 +11,7 @@ bScheduler* bSchedulerCreat()
     i->ActivetaskItems = TaskItemsList::New();
     // 这个occuR...就是 调度/主函数
     i->occupyRoutine = bRoutine::Alloc();
+    i->occupyRoutine->context = bContext::New();
     i->occupyRoutine->IsProgress = true;
     i->occupyRoutine->IsBegin = true;
     i->pendingRoutine = NULL;
@@ -51,12 +52,15 @@ void* RoutineBegin(void* args)
         i->IsBegin = true;
         i->func(i->args);
         i->IsDone = true;
+        i->IsBegin = false;
         free(i->args);
         i->args = nullptr;
         // 复用
         bRoutineEnv::get()->bRoutineRecycle(i);
+
         bScheduler::get()->SwapContext();
     }
+    return nullptr;
 }
 
 void* ProcessBegin(void* i)
@@ -95,5 +99,6 @@ void* ProcessBegin(void* i)
         if (Scheduler->IsStop)
             break;
     }
+    free(args);
     return 0;
 }

@@ -14,6 +14,7 @@ struct bEpTimer* bEpTimer::New()
     for (unsigned int a = 0; a < i->TaskItemBucketSize; a++)
         i->TaskItemBucket[a] = TaskItemsList::New();
     i->StartTime = bRoutineEnv::Timer::getNow_Ms();
+    return i;
 }
 
 bEpoll* bEpoll::New()
@@ -22,6 +23,7 @@ bEpoll* bEpoll::New()
     i->epollFd = epoll_create(1);
     i->ActiveTaskList = TaskItemsList::New();
     i->TimeOutTaskList = TaskItemsList::New();
+    i->TimeoutScaner = bEpTimer::New();
     i->Revents = (epollRevents*)calloc(1, sizeof(epollRevents));
     i->Revents->eventSize = BEpollMaxEventsSize;
     i->Revents->eventArr = (struct epoll_event*)calloc(i->Revents->eventSize, sizeof(struct epoll_event));

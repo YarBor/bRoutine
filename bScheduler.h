@@ -19,7 +19,7 @@ struct bScheduler {
     //   bRoutineStack *SharedStack;
     bRoutine* pendingRoutine;
     bRoutine* occupyRoutine;
-    TaskItemsList* ActivetaskItems;
+    struct TaskItemsList* ActivetaskItems;
     char IsThreadRunning;
     char IsStop;
     pthread_cond_t cond; // 条件变量

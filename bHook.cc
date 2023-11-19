@@ -115,4 +115,5 @@ static inline void freeFileDesc(int fd)
 ssize_t read(int fd, void* buf, size_t nbyte)
 {
     Do_Hook(read);
+    return 0;
 }
