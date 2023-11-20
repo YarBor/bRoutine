@@ -13,6 +13,7 @@ struct bRoutine {
     bRoutineStack* stack;
     struct bContext* context;
     static bRoutine* New(int StackLevel, RoutineFunc* func, void* args);
+    static void Del(bRoutine *);
     static bRoutine* Alloc();
     //   inline int Init(int StackLevel, RoutineFunc *func,void * args);
     void Resume();

@@ -13,13 +13,14 @@
         SchedulerHangTimeout_S, long(SchedulerHangTimeout_Ms * OneMsAsNs) + SchedulerHangTimeout_Ns \
     }
 struct bScheduler {
-    int ID;
     //   bRoutineStack *SharedStack;
     bRoutine* pendingRoutine;
     bRoutine* occupyRoutine;
     struct TaskItemsList* ActivetaskItems;
+    int ID;
     char IsThreadRunning;
     char IsStop;
+    char IsPendingNeedDelete;
     pthread_cond_t cond; // 条件变量
     pthread_mutex_t mutex; // 互斥锁
     timespec hangTimeOut;

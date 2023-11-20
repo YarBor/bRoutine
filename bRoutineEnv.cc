@@ -90,11 +90,14 @@ struct bRoutineStack* bRoutineEnv::bUnSharedStackPool_t::pop(int level)
     //   pthread_mutex_unlock(&this->mutex);
     return i;
 }
-void bRoutineEnv::bUnSharedStackPool_t::push(struct bRoutineStack* bst)
+int bRoutineEnv::bUnSharedStackPool_t::push(struct bRoutineStack* bst)
 {
     //   pthread_mutex_lock(&this->mutex);
     //   this->DoneRoutinesStacks.emplace_back(bst);
     //   pthread_mutex_unlock(&this->mutex);
+    if (RoutineNums >= Max_Keep_Routines_Thread) {
+        return -1;
+    }
     switch (bst->StackSize / 1024) {
     case bRoutineStack::LargeStackSize:
         pthread_mutex_lock(&this->mutexLarge);
@@ -114,6 +117,7 @@ void bRoutineEnv::bUnSharedStackPool_t::push(struct bRoutineStack* bst)
     default:
         break;
     }
+    return ++RoutineNums;
 }
 
 static bRoutineEnv* __bRoutineEnv = 0;
@@ -228,7 +232,11 @@ void bRoutineEnv::Deal()
 }
 void bRoutineEnv::bRoutineRecycle(bRoutine*& rt)
 {
-    this->UnSharedStackPool->push(rt->stack);
+    if (this->UnSharedStackPool->push(rt->stack) == -1) {
+        auto i = bScheduler::get();
+        i->IsPendingNeedDelete = 1;
+        i->SwapContext();
+    };
     rt->stack = nullptr;
     rt->context->stackPtr = nullptr;
     rt->context->stackSize = 0;

@@ -1,4 +1,4 @@
-#define Max_Keep_Routines_Thread 1000
+#define Max_Keep_Routines_Thread 0
 // 默认线程数量
 #define defaultProcess 2
 // hook最多监控多少文件描述符

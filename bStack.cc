@@ -39,5 +39,7 @@ struct bRoutineStack* bRoutineStack::New(int sizeLevel)
     }
     return ret;
 }
-
- 
+void Stack::Del(bRoutineStack* i)
+{
+    munmap(i->StackPtr, i->StackSize + 2 * Stack::GetPageSize_b());
+}

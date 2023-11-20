@@ -87,6 +87,10 @@ void* ProcessBegin(void* i)
                 // 上下文切换
                 Scheduler->pendingRoutine = task->self;
                 Scheduler->SwapContext();
+                if (Scheduler->IsPendingNeedDelete) {
+                    bRoutine::Del(Scheduler->pendingRoutine);
+                    Scheduler->IsPendingNeedDelete = 0;
+                }
             }
             TaskItem::Delete(task);
         } else {

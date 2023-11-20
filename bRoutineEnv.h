@@ -72,9 +72,10 @@ struct bRoutineEnv {
         List<struct bRoutineStack> DoneRoutinesMiniStacks;
         List<struct bRoutineStack> DoneRoutinesMediumStacks;
         List<struct bRoutineStack> DoneRoutinesLargeStacks;
-
+        // Recycle use to check, with common.h Set
+        int RoutineNums;
         struct bRoutineStack* pop(int Level);
-        void push(struct bRoutineStack*);
+        int push(struct bRoutineStack*);
         static struct bUnSharedStackPool_t* New();
     };
     struct Timer {

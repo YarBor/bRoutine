@@ -3,8 +3,10 @@
 // #include <string.h>
 
 #include "bRoutineEnv.h"
-void bRoutineInitProcessNumber(int i){
-    if (i <= 0) abort();
+void bRoutineInitProcessNumber(int i)
+{
+    if (i <= 0)
+        abort();
     else {
         bRoutineEnv::init(i);
     }
@@ -37,6 +39,12 @@ bRoutine* bRoutine::New(int StackLevel, RoutineFunc* func, void* args)
     i->args = args;
     // i->context->initContext(RoutineBegin, NULL);
     return i;
+}
+void bRoutine::Del(bRoutine* del)
+{
+    bContext::Del(del->context);
+    bRoutineStack::Del(del->stack);
+    free(del);
 }
 // 把目标加入就绪队列 并把自己切下去
 void bRoutine::Resume()

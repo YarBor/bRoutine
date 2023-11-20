@@ -22,6 +22,7 @@ struct bRoutineStack {
         LargeStackSize = LargeStackSize__
     };
     static struct bRoutineStack* New(int stackSizeLevel);
+    static void Del(bRoutineStack*);
     static uint GetPageSize_b()
     {
         static uint pageSize = getpagesize();
