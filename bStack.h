@@ -1,10 +1,9 @@
 #pragma once
-#define MiniStackSize__ 128
-#define MediumStackSize__ 1024
-#define LargeStackSize__ 4096
+
 #include <cstddef>
 #include <sys/mman.h>
 #include <unistd.h>
+#include "common.h"
 typedef unsigned int uint;
 enum StackLevel {
     // 128KB

@@ -3,6 +3,12 @@
 // #include <string.h>
 
 #include "bRoutineEnv.h"
+void bRoutineInitProcessNumber(int i){
+    if (i <= 0) abort();
+    else {
+        bRoutineEnv::init(i);
+    }
+}
 
 bRoutine* bRoutine::Alloc()
 {
@@ -17,10 +23,16 @@ bRoutine* bRoutine::New(int StackLevel, RoutineFunc* func, void* args)
         i = (bRoutine*)calloc(1, sizeof(bRoutine));
         i->context = bContext::New();
     }
+    i->IsBegin = 0;
+    i->IsDone = 0;
+    i->IsEnableHook = 1;
+    i->IsMain = 0;
+    i->IsProgress = 0;
+    i->IsHangup = 0;
     if ((i->stack = Env->UnSharedStackPool->pop(StackLevel)) == nullptr) {
         i->stack = bRoutineStack::New(StackLevel);
     }
-    i->context->init(i,i->stack);
+    i->context->init(i, i->stack);
     i->func = func;
     i->args = args;
     // i->context->initContext(RoutineBegin, NULL);

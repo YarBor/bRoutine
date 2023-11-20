@@ -22,18 +22,22 @@ public:
 private:
     pthread_mutex_t* m;
 };
-typedef void*(PerpareFuncPtr)(void*);
+typedef void*(PerpareFuncPtr)(void*, void*);
 typedef void*(CallBackFuncPtr)(void*);
+typedef void*(TimeOutCallFuncPtr)(void*);
 
 struct TaskItemsList;
 struct TaskItem {
     TaskItem* prev;
     TaskItem* next;
     TaskItemsList* owner;
+    // args + epoll_revents
     PerpareFuncPtr* perpareFuncPtr;
     void* perpareFuncArgs;
     CallBackFuncPtr* callbackFuncPtr;
     void* callbackFunArgs;
+    TimeOutCallFuncPtr* timeoutCallFunc;
+    void* timeoutCallFuncArgs;
     bRoutine* self;
     epoll_event bEpollEvent;
     int epollFd;

@@ -4,12 +4,10 @@
 #include <time.h>
 
 #include "bRoutine.h"
+#include "common.h"
 #include "bStack.h"
-#define OneMsAsNs 1000000
-#define SchedulerHangTimeout_S 0
-#define SchedulerHangTimeout_Ms 0.5
-#define SchedulerHangTimeout_Ns 0
 
+#define OneMsAsNs 1000000
 #define HangTimeout                                                                                 \
     {                                                                                               \
         SchedulerHangTimeout_S, long(SchedulerHangTimeout_Ms * OneMsAsNs) + SchedulerHangTimeout_Ns \

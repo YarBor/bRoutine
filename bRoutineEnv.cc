@@ -117,7 +117,6 @@ void bRoutineEnv::bUnSharedStackPool_t::push(struct bRoutineStack* bst)
 }
 
 static bRoutineEnv* __bRoutineEnv = 0;
-#define defaultProcess 1
 
 struct bRoutineEnv* InitializeBRoutineEnv(int RunProcessNums)
 {
@@ -155,6 +154,7 @@ void CreatMutProcessEnv(bRoutineEnv* New__bRoutineEnv)
     for (int i = 1; i < New__bRoutineEnv->TaskDistributor->size; ++i) {
         auto threadArg = (threadArgs*)calloc(1, sizeof(threadArgs));
         pthread_create(&threadArg->thread, NULL, ProcessBegin, threadArg);
+        pthread_detach(threadArg->thread);
         // 起物理线程
         // 初始化物理线程的调度者
     }
@@ -203,17 +203,23 @@ void bRoutineEnv::Deal()
         auto& arr = this->Epoll->Revents->eventArr;
         TaskItem* task;
         for (int q = 0; q < i; q++) {
+            if (((TaskItem*)arr[q].data.ptr)->perpareFuncPtr)
+                ((TaskItem*)arr[q].data.ptr)->perpareFuncPtr(((TaskItem*)arr[q].data.ptr)->perpareFuncArgs, arr + q);
+        }
+        for (int q = 0; q < i; q++) {
+            if (((TaskItem*)arr[q].data.ptr)->callbackFuncPtr)
+                ((TaskItem*)arr[q].data.ptr)->callbackFuncPtr(((TaskItem*)arr[q].data.ptr)->callbackFunArgs);
+        }
+        for (int q = 0; q < i; q++) {
             task = (TaskItem*)arr[q].data.ptr;
-            if (task->perpareFuncPtr)
-                task->perpareFuncPtr(task->perpareFuncArgs);
-            if (task->callbackFuncPtr)
-                task->callbackFuncPtr(task->callbackFunArgs);
             epoll_ctl(this->Epoll->epollFd, EPOLL_CTL_DEL, task->epollFd, &task->bEpollEvent);
-            this->TaskDistributor->AddTask(task);
         }
         task = nullptr;
         auto timeoutTaskList = this->Epoll->TimeoutScaner->NewMergeUpdate2Now();
         while ((task = timeoutTaskList->popHead()) != nullptr) {
+            if (task->timeoutCallFunc)
+                task->timeoutCallFunc(task->timeoutCallFuncArgs);
+            task->IsTasktimeout = 1;
             this->TaskDistributor->AddTask(task);
         }
         TaskItemsList::Delete(timeoutTaskList);

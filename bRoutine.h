@@ -1,7 +1,6 @@
 #pragma once
 // #include <sys/epoll.h>
 
-
 #include "bContext.h"
 #include "bStack.h"
 
@@ -10,7 +9,7 @@ struct bRoutine {
     /* data */
     RoutineFunc* func;
     void* args;
-    char IsMain, IsBegin, IsDone, IsHangup, IsProgress;
+    char IsMain, IsBegin, IsDone, IsHangup, IsProgress, IsEnableHook;
     bRoutineStack* stack;
     struct bContext* context;
     static bRoutine* New(int StackLevel, RoutineFunc* func, void* args);
@@ -19,3 +18,4 @@ struct bRoutine {
     void Resume();
     static void yield();
 };
+void bRoutineInitProcessNumber(int);
