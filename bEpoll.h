@@ -38,3 +38,5 @@ struct bEpoll {
 
 template <typename T>
 T* RemoveSelfFromOwnerlink(T* i);
+template <typename T>
+T* RemoveSelfFromOwnerlink_Save(T* i);

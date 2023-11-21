@@ -11,6 +11,12 @@ void bRoutineInitProcessNumber(int i)
         bRoutineEnv::init(i);
     }
 }
+bRoutine* bRoutine::getSelf()
+{
+    bRoutineEnv::get();
+    auto j = bScheduler::get();
+    return j->occupyRoutine;
+}
 
 bRoutine* bRoutine::Alloc()
 {

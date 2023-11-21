@@ -1,6 +1,9 @@
+#include "bRoutineEnv.h"
+#include "common.h"
 #include <dlfcn.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <map>
 #include <netdb.h>
 #include <netinet/in.h>
 #include <poll.h>
@@ -17,9 +20,6 @@
 #include <sys/un.h>
 #include <time.h>
 #include <unistd.h>
-#include "common.h"
-#include "bRoutineEnv.h"
-#include <map>
 
 typedef int (*socket_pfn_t)(int domain, int type, int protocol);
 typedef int (*accept_pfn_t)(int fd, struct sockaddr* addr, socklen_t* len);
@@ -216,7 +216,7 @@ void* pollPerpare(void* args, void* epoll_revent)
     pm->_activeFdsNums2++;
     if (!pm->IsRemoveFromTimeoutList) {
         pm->IsRemoveFromTimeoutList = 1;
-        RemoveSelfFromOwnerlink(pm->task);
+        RemoveSelfFromOwnerlink_Save(pm->task);
     }
     return 0;
 }
@@ -242,7 +242,7 @@ int poll(struct pollfd fds[], nfds_t nfds, int timeout)
     // 是私有栈区
     poll_message pm(fds, nfds);
     auto Env = bRoutineEnv::get();
-    Env->Epoll->TimeoutScaner->getBucket((timeout > 0 ? timeout : Env->Epoll->TimeoutScaner->TaskItemBucketSize - 1) + bRoutineEnv::Timer::getNow_Ms())->pushBack(pm.task);
+    Env->Epoll->TimeoutScaner->getBucket(timeout)->pushBack(pm.task);
     for (int i = 0; i < pm.fdSize; i++) {
         epoll_ctl(Env->Epoll->epollFd, EPOLL_CTL_ADD, pm.eachFdTask[i]->epollFd, &pm.eachFdTask[i]->bEpollEvent);
     }

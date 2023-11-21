@@ -22,7 +22,14 @@ T  * RemoveSelfFromOwnerlink(T* i)
     i->prev = nullptr;
     return i;
 }
-
+template <typename T>
+T* RemoveSelfFromOwnerlink_Save(T* i){
+    // pthread_mutex_t* ;
+    LockGuard(i->owner->HeadMutex);
+    LockGuard(i->owner->TailMutex);
+    auto a = RemoveSelfFromOwnerlink(i);
+    return a;
+}
 struct TaskItem* TaskItem::New()
 {
     struct TaskItem* i = (struct TaskItem*)calloc(1, sizeof(struct TaskItem));
