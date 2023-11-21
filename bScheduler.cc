@@ -57,7 +57,6 @@ void* RoutineBegin(void* args)
         i->args = nullptr;
         // 复用
         bRoutineEnv::get()->bRoutineRecycle(i);
-
         bScheduler::get()->SwapContext();
     }
     return nullptr;

@@ -62,3 +62,34 @@ struct TaskItemsList {
     void pushBackUnsafe(TaskItem* i);
     TaskItem* popHeadUnsafe();
 };
+template <typename T>
+T* RemoveSelfFromOwnerlink(T* i)
+{
+    if (i == nullptr || i->owner == nullptr || i == i->owner->head)
+        return nullptr; // 如果i为空，则直接返回nullptr。
+                        //   assert(i != i->owner->head);
+    if (i == i->owner->tail) {
+        i->owner->tail = i->prev;
+        i->prev->next = nullptr;
+        i->prev = nullptr;
+        i->owner = nullptr;
+        return i;
+    }
+    auto p = i->prev;
+    auto n = i->next;
+    i->owner = nullptr;
+    i->prev->next = n;
+    i->next->prev = p;
+    i->next = nullptr;
+    i->prev = nullptr;
+    return i;
+}
+template <typename T>
+T* RemoveSelfFromOwnerlink_Save(T* i)
+{
+    // pthread_mutex_t* ;
+    LockGuard(i->owner->HeadMutex);
+    LockGuard(i->owner->TailMutex);
+    auto a = RemoveSelfFromOwnerlink(i);
+    return a;
+}

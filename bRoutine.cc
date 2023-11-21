@@ -3,6 +3,7 @@
 // #include <string.h>
 
 #include "bRoutineEnv.h"
+#include <atomic>
 void bRoutineInitProcessNumber(int i)
 {
     if (i <= 0)
@@ -25,12 +26,14 @@ bRoutine* bRoutine::Alloc()
 }
 bRoutine* bRoutine::New(int StackLevel, RoutineFunc* func, void* args)
 {
+    static std::atomic<ushort> id;
     auto Env = bRoutineEnv ::get();
     bRoutine* i;
     if ((i = Env->RoutinePool->pop()) == nullptr) {
         i = (bRoutine*)calloc(1, sizeof(bRoutine));
         i->context = bContext::New();
     }
+    i->id = ++id;
     i->IsBegin = 0;
     i->IsDone = 0;
     i->IsEnableHook = 1;
@@ -61,8 +64,8 @@ void bRoutine::Resume()
     auto taskItem2 = TaskItem::New();
     taskItem1->self = this;
     taskItem2->self = Sch->occupyRoutine;
-    Env->TaskDistributor->AddTask(taskItem1);
     Env->TaskDistributor->AddTask(taskItem2);
+    Env->TaskDistributor->AddTask(taskItem1);
     Sch->SwapContext();
 }
 void bRoutine::yield()

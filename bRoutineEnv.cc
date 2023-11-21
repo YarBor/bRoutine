@@ -200,10 +200,13 @@ struct bRoutineEnv::bUnSharedStackPool_t* bRoutineEnv::bUnSharedStackPool_t::New
 }
 void bRoutineEnv::Deal()
 {
+    DebugPrint("bRoutineEnv::Deal Called\n");
     int i = epoll_wait(this->Epoll->epollFd, this->Epoll->Revents->eventArr, this->Epoll->Revents->eventSize, 0);
     if (i == -1) {
         throw("epoll return false Erron :>" + std::to_string(errno));
     } else {
+        if (i)
+            DebugPrint("EpollWait Return %d\n", i);
         auto& arr = this->Epoll->Revents->eventArr;
         TaskItem* task;
         for (int q = 0; q < i; q++) {
@@ -220,6 +223,8 @@ void bRoutineEnv::Deal()
         }
         task = nullptr;
         auto timeoutTaskList = this->Epoll->TimeoutScaner->NewMergeUpdate2Now();
+        if (timeoutTaskList->ItemCount.load())
+            DebugPrint("epoll Timer merge %d task\n", timeoutTaskList->ItemCount.load());
         while ((task = timeoutTaskList->popHead()) != nullptr) {
             if (task->timeoutCallFunc)
                 task->timeoutCallFunc(task->timeoutCallFuncArgs);
@@ -235,7 +240,8 @@ void bRoutineEnv::bRoutineRecycle(bRoutine*& rt)
     if (this->UnSharedStackPool->push(rt->stack) == -1) {
         auto i = bScheduler::get();
         i->IsPendingNeedDelete = 1;
-        i->SwapContext();
+        return;
+        // i->SwapContext();
     };
     rt->stack = nullptr;
     rt->context->stackPtr = nullptr;

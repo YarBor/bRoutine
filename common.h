@@ -17,3 +17,13 @@
 #define TIMEWAITSECONDS_S 30
 // epoll 同一时间返回的事件容量
 #define BEpollMaxEventsSize 1e5
+
+// 取消debug信息 把下面的注释了
+#define IsPrintDebugInfo
+
+#if defined IsPrintDebugInfo
+#include <stdio.h>
+#define DebugPrint(...) fprintf(stderr,__VA_ARGS__)
+#else
+#define DebugPrint(...)
+#endif

@@ -4,7 +4,7 @@
 #include <sys/epoll.h>
 
 #include "bRoutine.h"
-#include "bTask.h"
+#include "bTask.hh"
 // #include "bRoutineEnv.h"
 #include "common.h"
 #include <atomic>
@@ -14,8 +14,8 @@ struct bEpTimer {
     unsigned long long TaskItemBucketSize;
     //
     /*这俩是一起变的*/
-    unsigned long long StartTime;
-    unsigned long long BucketPosNow;
+    unsigned long long LastCheckTime;
+    std::atomic<unsigned long long> BucketPosNow;
     //
     struct TaskItemsList* getBucket(unsigned long long ms_want);
     struct TaskItemsList* NewMergeUpdate2Now();
@@ -36,7 +36,3 @@ struct bEpoll {
     std::atomic_ullong lastCheckTime;
 };
 
-template <typename T>
-T* RemoveSelfFromOwnerlink(T* i);
-template <typename T>
-T* RemoveSelfFromOwnerlink_Save(T* i);

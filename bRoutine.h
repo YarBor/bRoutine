@@ -10,6 +10,7 @@ struct bRoutine {
     RoutineFunc* func;
     void* args;
     char IsMain, IsBegin, IsDone, IsHangup, IsProgress, IsEnableHook;
+    unsigned short id;
     bRoutineStack* stack;
     struct bContext* context;
     static bRoutine* New(int StackLevel, RoutineFunc* func, void* args);

@@ -160,7 +160,7 @@ struct poll_message {
         this->fdSize = nfds;
         // ProcessBegin delete
         task = TaskItem::New();
-        task->self = bScheduler::get()->occupyRoutine;
+        task->self = bRoutine::getSelf();
         eachFdTask = (TaskItem**)calloc(this->fdSize, sizeof(TaskItem*));
         for (int i = 0; i < this->fdSize; i++) {
             eachFdTask[i] = TaskItem::New();
@@ -194,6 +194,7 @@ struct poll_message {
 };
 void* pollTimeout(void* args)
 {
+    DebugPrint("pollTimeout\n");
     poll_message* pm = (poll_message*)args;
     auto Env = bRoutineEnv::get();
     for (int i = 0; i < pm->fdSize; i++) {
@@ -242,11 +243,13 @@ int poll(struct pollfd fds[], nfds_t nfds, int timeout)
     // 是私有栈区
     poll_message pm(fds, nfds);
     auto Env = bRoutineEnv::get();
-    Env->Epoll->TimeoutScaner->getBucket(timeout)->pushBack(pm.task);
+    Env->Epoll->TimeoutScaner->getBucket(timeout < 0 ? INTMAX_MAX : timeout)->pushBack(pm.task);
     for (int i = 0; i < pm.fdSize; i++) {
         epoll_ctl(Env->Epoll->epollFd, EPOLL_CTL_ADD, pm.eachFdTask[i]->epollFd, &pm.eachFdTask[i]->bEpollEvent);
     }
+    DebugPrint("Routine(%d)poll registe \n",bRoutine::getSelf()->id);
     bScheduler::get()->SwapContext();
+    DebugPrint("Routine(%d)poll return \n",bRoutine::getSelf()->id);
     // 返回的时候 通过回调 操作过了 fds参数
     if (!pm.task->IsTasktimeout)
         for (int i = 0; i < pm.fdSize; i++) {
