@@ -11,6 +11,7 @@ bScheduler* bSchedulerCreat()
     i->ActivetaskItems = TaskItemsList::New();
     // 这个occuR...就是 调度/主函数
     i->occupyRoutine = bRoutine::Alloc();
+    i->occupyRoutine->IsEnableHook = 1;
     i->occupyRoutine->context = bContext::New();
     i->occupyRoutine->IsProgress = true;
     i->occupyRoutine->IsBegin = true;

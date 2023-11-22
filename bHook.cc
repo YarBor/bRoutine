@@ -66,10 +66,14 @@ struct fileDesc {
 static inline bool isEnableHook()
 {
     auto i = bScheduler::get();
-    if (i->occupyRoutine->IsProgress)
+    if (i->occupyRoutine->IsProgress && !i->occupyRoutine->IsMain) {
+        DebugPrint("return false\n");
         return false;
-    else
+    } else {
+        if (!i->occupyRoutine->IsEnableHook)
+            DebugPrint("return false\n");
         return i->occupyRoutine->IsEnableHook;
+    }
 }
 
 static struct fileDesc* hooksFdSet[HookContralFdNums] = {};
@@ -194,7 +198,7 @@ struct poll_message {
 };
 void* pollTimeout(void* args)
 {
-    DebugPrint("pollTimeout\n");
+    // DebugPrint("pollTimeout\n");
     poll_message* pm = (poll_message*)args;
     auto Env = bRoutineEnv::get();
     for (int i = 0; i < pm->fdSize; i++) {
@@ -235,8 +239,10 @@ void* pollCallback(void* args)
 int poll(struct pollfd fds[], nfds_t nfds, int timeout)
 {
     Do_Hook(poll);
-    if (!isEnableHook() || timeout == 0)
+    if (!isEnableHook() || timeout == 0) {
+        DebugPrint("%d isNotEnableHook\n",bRoutine::getSelf()->id);
         return Hook_Func(poll)(fds, nfds, timeout);
+    }
     // 这里是 pm 存的是 fds 的指针
     // 回调时 操作 pm 中的 fds 的指针
     // 直接操作fds的数据 不用copy
@@ -247,9 +253,9 @@ int poll(struct pollfd fds[], nfds_t nfds, int timeout)
     for (int i = 0; i < pm.fdSize; i++) {
         epoll_ctl(Env->Epoll->epollFd, EPOLL_CTL_ADD, pm.eachFdTask[i]->epollFd, &pm.eachFdTask[i]->bEpollEvent);
     }
-    DebugPrint("Routine(%d)poll registe \n",bRoutine::getSelf()->id);
+    // DebugPrint("Routine(%d)poll registe \n", bRoutine::getSelf()->id);
     bScheduler::get()->SwapContext();
-    DebugPrint("Routine(%d)poll return \n",bRoutine::getSelf()->id);
+    // DebugPrint("Routine(%d)poll return \n", bRoutine::getSelf()->id);
     // 返回的时候 通过回调 操作过了 fds参数
     if (!pm.task->IsTasktimeout)
         for (int i = 0; i < pm.fdSize; i++) {

@@ -65,9 +65,21 @@ struct TaskItemsList {
 template <typename T>
 T* RemoveSelfFromOwnerlink(T* i)
 {
-    if (i == nullptr || i->owner == nullptr || i == i->owner->head)
+    if (i == nullptr || i->owner == nullptr )
         return nullptr; // 如果i为空，则直接返回nullptr。
                         //   assert(i != i->owner->head);
+    if (i->owner->head == i) {
+        if (i == i->owner->tail) {
+            i->owner->head = nullptr;
+            i->owner->tail = nullptr;
+        } else {
+            i->next->prev = NULL;
+            i->owner->head = i->next;
+        }
+        i->next = NULL;
+        i->owner = NULL;
+        return i;
+    }
     if (i == i->owner->tail) {
         i->owner->tail = i->prev;
         i->prev->next = nullptr;
@@ -78,8 +90,8 @@ T* RemoveSelfFromOwnerlink(T* i)
     auto p = i->prev;
     auto n = i->next;
     i->owner = nullptr;
-    i->prev->next = n;
-    i->next->prev = p;
+    p->next = n;
+    n->prev = p;
     i->next = nullptr;
     i->prev = nullptr;
     return i;

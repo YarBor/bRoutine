@@ -151,6 +151,7 @@ void CreatMutProcessEnv(bRoutineEnv* New__bRoutineEnv)
     auto threadArg = (threadArgs*)calloc(1, sizeof(threadArgs));
     bRoutine* mainR = bRoutine::New(StackLevel::LargeStack, ProcessBegin, threadArg);
     thisSch->pendingRoutine = mainR;
+    mainR->IsEnableHook = true;
     thisSch->pendingRoutine->IsProgress = true;
     thisSch->occupyRoutine->IsMain = true;
     thisSch->SwapContext();
@@ -200,7 +201,7 @@ struct bRoutineEnv::bUnSharedStackPool_t* bRoutineEnv::bUnSharedStackPool_t::New
 }
 void bRoutineEnv::Deal()
 {
-    DebugPrint("bRoutineEnv::Deal Called\n");
+    // DebugPrint("bRoutineEnv::Deal Called\n");
     int i = epoll_wait(this->Epoll->epollFd, this->Epoll->Revents->eventArr, this->Epoll->Revents->eventSize, 0);
     if (i == -1) {
         throw("epoll return false Erron :>" + std::to_string(errno));
@@ -270,7 +271,7 @@ unsigned long long bRoutineEnv::Timer::getNow_Ns()
     return std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now().time_since_epoch())
         .count();
 }
-
+// 不能偷main 容易造成内存上下文切换异常
 TaskItem* Try2stealTask(TaskItemsList* activeTask)
 {
     TaskItem* a = nullptr;
@@ -298,11 +299,20 @@ TaskItem* Try2stealTask(TaskItemsList* activeTask)
 
         // 执行任务弹出操作
         a = activeTask->popHeadUnsafe();
-
+        if (a->self->IsMain) {
+            activeTask->pushBackUnsafe(a);
+        }
         pthread_mutex_unlock(activeTask->TailMutex);
     } else {
         // 执行任务弹出操作
         a = activeTask->popHeadUnsafe();
+        if (a->self->IsMain) {
+            pthread_mutex_lock(activeTask->TailMutex);
+            activeTask->pushBackUnsafe(a);
+            pthread_mutex_unlock(activeTask->HeadMutex);
+            pthread_mutex_unlock(activeTask->TailMutex);
+            return nullptr;
+        }
     }
     pthread_mutex_unlock(activeTask->HeadMutex);
     return a;

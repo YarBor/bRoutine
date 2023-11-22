@@ -64,8 +64,8 @@ void bRoutine::Resume()
     auto taskItem2 = TaskItem::New();
     taskItem1->self = this;
     taskItem2->self = Sch->occupyRoutine;
-    Env->TaskDistributor->AddTask(taskItem2);
     Env->TaskDistributor->AddTask(taskItem1);
+    Env->TaskDistributor->AddTask(taskItem2);
     Sch->SwapContext();
 }
 void bRoutine::yield()

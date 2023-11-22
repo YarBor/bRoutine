@@ -23,7 +23,11 @@
 
 #if defined IsPrintDebugInfo
 #include <stdio.h>
-#define DebugPrint(...) fprintf(stderr,__VA_ARGS__)
+#define DebugPrint(...)                               \
+    do {                                              \
+        fprintf(stderr, "%s:%d\n\t", __FILE__, __LINE__); \
+        fprintf(stderr, __VA_ARGS__);                 \
+    } while (0)
 #else
 #define DebugPrint(...)
 #endif

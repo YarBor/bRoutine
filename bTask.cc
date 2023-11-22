@@ -21,9 +21,8 @@ struct TaskItemsList* TaskItemsList::New()
     *i->HeadMutex = PTHREAD_MUTEX_INITIALIZER;
     i->TailMutex = (decltype(i->TailMutex))calloc(1, sizeof(pthread_mutex_t));
     *i->TailMutex = PTHREAD_MUTEX_INITIALIZER;
-    i->head = TaskItem::New();
-    i->head->owner = i;
-    i->tail = i->head;
+    i->head = NULL;
+    i->tail = NULL;
     i->ItemCount = 0;
     return i;
 }
@@ -31,12 +30,17 @@ struct TaskItemsList* TaskItemsList::New()
 void TaskItemsList::pushBack(TaskItem* item)
 {
     bool lockHead = false;
+retry:
     if (this->ItemCount.load() < 2) {
         pthread_mutex_lock(this->HeadMutex);
         lockHead = true;
     }
-
     pthread_mutex_lock(this->TailMutex);
+    // 因为阻塞拿锁 导致 拿到锁时ItemCount < 2 不能直接操作数据
+    if (this->ItemCount.load() < 2 && !lockHead) {
+        pthread_mutex_unlock(this->TailMutex);
+        goto retry;
+    }
 
     this->pushBackUnsafe(item);
 
@@ -75,19 +79,26 @@ TaskItem* TaskItemsList::popHead()
 
 void TaskItemsList::pushBackUnsafe(TaskItem* i)
 {
-    this->tail->next = i;
-    i->prev = this->tail;
-    this->tail = i;
-    i->next = nullptr;
-    i->owner = this;
+    if (i == nullptr)
+        return;
     ++this->ItemCount;
+    if (this->head == NULL && this->tail == NULL) {
+        this->head = i;
+        this->tail = i;
+    } else {
+        this->tail->next = i;
+        i->prev = this->tail;
+        this->tail = i;
+        i->next = nullptr;
+    }
+    i->owner = this;
 }
 TaskItem* TaskItemsList::popHeadUnsafe()
 {
-    if (this->ItemCount == 0)
+    if (this->ItemCount.load() == 0 || this->tail == NULL || this->head == NULL)
         return nullptr;
-    auto i = RemoveSelfFromOwnerlink(this->head->next);
     --ItemCount;
+    auto i = RemoveSelfFromOwnerlink(this->head);
     return i;
 }
 
@@ -99,10 +110,9 @@ void TaskItemsList::pushAll2(TaskItemsList* i)
     MtxLockGuard(i->HeadMutex);
     MtxLockGuard(i->TailMutex);
     TaskItem* t;
-    while ((t = RemoveSelfFromOwnerlink(this->tail)) != nullptr) {
+    while ((t = RemoveSelfFromOwnerlink(this->head)) != nullptr) {
         --this->ItemCount;
         i->pushBackUnsafe(t);
-        ++i->ItemCount;
     }
 }
 void TaskItemsList::Delete(TaskItemsList*& i)

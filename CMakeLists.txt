@@ -1,7 +1,7 @@
 project(bRoutine)
 cmake_minimum_required(VERSION 3.22)
 
-set(CMAKE_C_FLAGS ${CMAKE_C_FLAGS} -g -fno-strict-aliasing -O0   -export-dynamic -Wall -pipe  -D_GNU_SOURCE -D_REENTRANT -fPIC -Wno-deprecated -m64)
+set(CMAKE_C_FLAGS ${CMAKE_C_FLAGS} -g -fno-strict-aliasing -O2 -export-dynamic -Wall -pipe  -D_GNU_SOURCE -D_REENTRANT -fPIC -Wno-deprecated -m64)
 set(CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS} -g )
 # set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g")
 
@@ -10,12 +10,11 @@ set(BROUTINE_VERSION  0.1)
 enable_language(C ASM)
 
 set(SOURCE_FILES
-        bConditionVar.cc
         bHook.cc
         bRoutineEnv.cc
         bTask.cc
         bContext.cc
-        bMutex.cc
+        bMutex_Cond.cc
         bScheduler.cc
         bTimer.cc
         bEpoll.cc
@@ -45,4 +44,4 @@ macro(add_example_target EXAMPLE_TARGET)
 endmacro(add_example_target)
 
 add_executable(test test.cc)
-target_link_libraries(test bRoutine_static pthread dl g)
+target_link_libraries(test bRoutine_static pthread dl)
