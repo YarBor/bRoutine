@@ -20,7 +20,7 @@ void bRoutineEnv::TaskDistributor_t::AddTask(TaskItem* task)
         throw("Task commit Wrong");
     }
     this->ActiveTasks[i]->pushBack(task);
-    if ((!this->schedulers[i]->IsThreadRunning) && pthread_mutex_trylock(&this->schedulers[i]->mutex)) {
+    if ((!this->schedulers[i]->IsThreadRunning) && !pthread_mutex_trylock(&this->schedulers[i]->mutex)) {
         pthread_cond_signal(&this->schedulers[i]->cond);
         pthread_mutex_unlock(&this->schedulers[i]->mutex);
     }
@@ -145,13 +145,14 @@ void* ProcessBegin(void* i);
 void CreatMutProcessEnv(bRoutineEnv* New__bRoutineEnv)
 {
     bScheduler* thisSch = bScheduler::get();
-
+    thisSch->occupyRoutine->id = 1;
     // New__bRoutineEnv->TaskDistributor->schedulers[0] = thisSch;
     // 挂起主线程
     auto threadArg = (threadArgs*)calloc(1, sizeof(threadArgs));
     bRoutine* mainR = bRoutine::New(StackLevel::LargeStack, ProcessBegin, threadArg);
-    thisSch->pendingRoutine = mainR;
+    mainR->id = 0;
     mainR->IsEnableHook = true;
+    thisSch->pendingRoutine = mainR;
     thisSch->pendingRoutine->IsProgress = true;
     thisSch->occupyRoutine->IsMain = true;
     thisSch->SwapContext();

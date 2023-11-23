@@ -10,7 +10,7 @@ struct bMutexCondTask {
 struct bMutexCondTaskList {
     struct bMutexCondTask* head = NULL;
     struct bMutexCondTask* tail = NULL;
-    pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+    pthread_mutex_t mutex;
     bool add(bRoutine*);
     bMutexCondTask* pop();
 };
@@ -22,16 +22,18 @@ struct bMutex {
     bMutex()
     {
         this->list = new bMutexCondTaskList;
+        this->list->mutex = PTHREAD_MUTEX_INITIALIZER;
     }
     ~bMutex()
     {
+        pthread_mutex_destroy(&this->list->mutex);
         delete list;
     }
 };
 struct bCond {
     bMutexCondTaskList* list;
-    void wait(bMutex *);
-    int timeWait(bMutex *,int timeout_ms);
+    void wait(bMutex*);
+    int timeWait(bMutex*, int timeout_ms);
     void signalOnce();
     void signalAll();
     bCond()

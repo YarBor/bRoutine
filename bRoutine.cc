@@ -77,3 +77,9 @@ void bRoutine::yield()
     Env->TaskDistributor->AddTask(taskItem2);
     Sch->SwapContext();
 }
+void bRoutine::deleteSelf()
+{
+    auto Sch = bScheduler::get();
+    Sch->IsPendingNeedDelete = true;
+    Sch->SwapContext();
+}

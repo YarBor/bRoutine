@@ -20,5 +20,6 @@ struct bRoutine {
     void Resume();
     static bRoutine* getSelf();
     static void yield();
+    static void deleteSelf();
 };
 void bRoutineInitProcessNumber(int);

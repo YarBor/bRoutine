@@ -9,9 +9,10 @@ bScheduler* bSchedulerCreat()
 {
     auto i = (struct bScheduler*)calloc(1, sizeof(struct bScheduler));
     i->ActivetaskItems = TaskItemsList::New();
-    // 这个occuR...就是 调度/主函数
+    // 这个occuR...就是 调度/主函数 (单线程时 是主函数 ,其他工作线程是调度函数)
     i->occupyRoutine = bRoutine::Alloc();
     i->occupyRoutine->IsEnableHook = 1;
+    i->occupyRoutine->id = 0;
     i->occupyRoutine->context = bContext::New();
     i->occupyRoutine->IsProgress = true;
     i->occupyRoutine->IsBegin = true;
@@ -41,6 +42,7 @@ void bScheduler::SwapContext()
         this->ActivetaskItems->pushBack(i);
     }
     std::swap(this->occupyRoutine, this->pendingRoutine);
+    DebugPrint("%d Routines wake up\n", this->occupyRoutine->id);
     bSwap(this->pendingRoutine->context, this->occupyRoutine->context);
 }
 
@@ -74,9 +76,13 @@ void* ProcessBegin(void* i)
     unsigned long long now;
     while (1) {
         now = bRoutineEnv::Timer::getNow_Ms();
-        if ((now - Env->Epoll->lastCheckTime.load()) && pthread_mutex_trylock(&Env->bEpollDealLock)) {
-            Env->Deal();
-            pthread_mutex_unlock(&Env->bEpollDealLock);
+        if ((now - Env->Epoll->lastCheckTime.load())) {
+            if (!pthread_mutex_trylock(&Env->bEpollDealLock)) {
+                Env->Deal();
+                pthread_mutex_unlock(&Env->bEpollDealLock);
+            } else {
+                DebugPrint("try lock Env->bEpollDealLock false \n");
+            }
         }
 
         task = Scheduler->ActivetaskItems->popHead();
@@ -88,7 +94,8 @@ void* ProcessBegin(void* i)
                 Scheduler->pendingRoutine = task->self;
                 Scheduler->SwapContext();
                 if (Scheduler->IsPendingNeedDelete) {
-                    bRoutine::Del(Scheduler->pendingRoutine);
+                    if (Scheduler->pendingRoutine->IsMain == false)
+                        bRoutine::Del(Scheduler->pendingRoutine);
                     Scheduler->IsPendingNeedDelete = 0;
                 }
             }

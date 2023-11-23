@@ -2,7 +2,9 @@
 #include "bRoutineEnv.h"
 bool bMutexCondTaskList::add(bRoutine* r)
 {
-    if (pthread_mutex_trylock(&this->mutex)) {
+retry:
+    if (!pthread_mutex_trylock(&mutex)) {
+        DebugPrint("%d bMutexCond List lock successed\n", r->id);
         auto i = new bMutexCondTask;
         i->routine = r;
         if (tail == NULL) {
@@ -13,29 +15,40 @@ bool bMutexCondTaskList::add(bRoutine* r)
             i->prev = tail;
             tail = i;
         }
-        pthread_mutex_unlock(&this->mutex);
-        return true;
+        DebugPrint("%d bMutexCond List lock relased\n", r->id);
+        pthread_mutex_unlock(&mutex);
     } else {
-        return false;
+        DebugPrint("%d bMutexCond List lock failed\n", r->id);
+        bRoutine::getSelf()->yield();
+        goto retry;
     }
+    return true;
 }
 bMutexCondTask* bMutexCondTaskList::pop()
 {
     bMutexCondTask* result;
-    pthread_mutex_lock(&this->mutex);
-    if (head == NULL)
-        result = 0;
-    else if (head == tail) {
-        result = head;
-        head = NULL;
-        tail = NULL;
+retry:
+    if (!pthread_mutex_trylock(&this->mutex)) {
+        DebugPrint("%d bMutexCond List lock successed\n", bRoutine::getSelf()->id);
+        if (head == NULL)
+            result = 0;
+        else if (head == tail) {
+            result = head;
+            head = NULL;
+            tail = NULL;
+        } else {
+            result = head;
+            head = head->next;
+            head->prev = NULL;
+            result->next = NULL;
+        }
+        DebugPrint("%d bMutexCond List lock relased\n", bRoutine::getSelf()->id);
+        pthread_mutex_unlock(&this->mutex);
     } else {
-        result = head;
-        head = head->next;
-        head->prev = NULL;
-        result->next = NULL;
+        DebugPrint("%d bMutexCond List lock failed\n", bRoutine::getSelf()->id);
+        bRoutine::getSelf()->yield();
+        goto retry;
     }
-    pthread_mutex_unlock(&this->mutex);
     return result;
 }
 
@@ -44,13 +57,20 @@ void bMutex::lock()
     int i = 0;
     bool isSuccessLock;
 retry:
+    DebugPrint("%d try Locked\n", bRoutine::getSelf()->id);
     isSuccessLock = this->lockCount.compare_exchange_strong(i, 1);
     if (!isSuccessLock) {
+        DebugPrint("%d try Locke false\n", bRoutine::getSelf()->id);
         if (this->list->add(bRoutine::getSelf())) {
+            DebugPrint("%d add self to lock List\n", bRoutine::getSelf()->id);
             bScheduler::get()->SwapContext();
+        } else {
+            DebugPrint("%d yield self\n", bRoutine::getSelf()->id);
+            bRoutine::getSelf()->yield();
         }
         goto retry;
     }
+    DebugPrint("%d Locked\n", bRoutine::getSelf()->id);
 }
 void bMutex::unlock()
 {
@@ -60,6 +80,7 @@ void bMutex::unlock()
     if (!isSuccessLock) {
         abort();
     }
+    DebugPrint("%d unLocked\n", bRoutine::getSelf()->id);
     auto mt = this->list->pop();
     if (mt) {
         auto t = TaskItem::New();
@@ -93,6 +114,7 @@ int bCond::timeWait(bMutex* lock, int timeout_ms)
     bRoutineEnv::get()->Epoll->TimeoutScaner->getBucket(timeout_ms)->pushBack(t);
     bScheduler::get()->SwapContext();
     if (IsTimeout == 0) {
+        RemoveSelfFromOwnerlink_Save(t);
         lock->lock();
         return 1;
     } else {
@@ -112,8 +134,8 @@ void bCond::signalAll()
 }
 void bCond::signalOnce()
 {
-    bMutexCondTask* t = 0;
     bRoutineEnv* env = bRoutineEnv::get();
+    bMutexCondTask* t = this->list->pop();
     auto ta = TaskItem::New();
     ta->self = t->routine;
     env->TaskDistributor->AddTask(ta);
