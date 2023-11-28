@@ -18,11 +18,31 @@ void* Producer(void* args)
     stEnv_t* env = (stEnv_t*)args;
     int id = 0;
     while (true) {
-        stTask_t* task = (stTask_t*)calloc(1, sizeof(stTask_t));
-        task->id = id++;
-        env->task_queue.push(task);
-        printf("%s:%d produce task %d\n", __func__, __LINE__, task->id);
-        env->cond->signalOnce();
+        {
+            stTask_t* task = (stTask_t*)calloc(1, sizeof(stTask_t));
+            task->id = id++;
+            env->task_queue.push(task);
+            printf("%s:%d produce task %d\n", __func__, __LINE__, task->id);
+        }
+        {
+            stTask_t* task = (stTask_t*)calloc(1, sizeof(stTask_t));
+            task->id = id++;
+            env->task_queue.push(task);
+            printf("%s:%d produce task %d\n", __func__, __LINE__, task->id);
+        }
+        {
+            stTask_t* task = (stTask_t*)calloc(1, sizeof(stTask_t));
+            task->id = id++;
+            env->task_queue.push(task);
+            printf("%s:%d produce task %d\n", __func__, __LINE__, task->id);
+        }
+        {
+            stTask_t* task = (stTask_t*)calloc(1, sizeof(stTask_t));
+            task->id = id++;
+            env->task_queue.push(task);
+            printf("%s:%d produce task %d\n", __func__, __LINE__, task->id);
+        }
+        env->cond->signalAll();
         poll(NULL, 0, 1000);
     }
     return NULL;
@@ -49,6 +69,8 @@ int main()
     stEnv_t* env = new stEnv_t;
     env->cond = new bCond;
 
+    bRoutine::New(StackLevel::MiniStack, Consumer, env)->Resume();
+    bRoutine::New(StackLevel::MiniStack, Consumer, env)->Resume();
     bRoutine::New(StackLevel::MiniStack, Consumer, env)->Resume();
 
     bRoutine::New(StackLevel::MediumStack, Producer, env)->Resume();

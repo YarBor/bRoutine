@@ -1,9 +1,16 @@
 // #include "bScheduler.h"
-
-#include <stdlib.h>
-
 #include "bContext.h"
 #include "bRoutineEnv.h"
+#include <stdlib.h>
+#ifdef TEST_SWAP_TIME
+unsigned long long testSwapTime;
+uint64_t get_timestamp()
+{
+    uint32_t low, high;
+    asm volatile("rdtsc" : "=a" (low), "=d" (high));
+    return (static_cast<uint64_t>(high) << 32) | low;
+}
+#endif
 static __thread struct bScheduler* scheduler = 0;
 bScheduler* bSchedulerCreat()
 {
@@ -33,6 +40,7 @@ struct bScheduler* bScheduler::get()
     }
     return scheduler;
 }
+
 void bScheduler::SwapContext()
 {
     if (this->occupyRoutine->IsMain && this->occupyRoutine->IsProgress) {
@@ -41,11 +49,20 @@ void bScheduler::SwapContext()
         this->occupyRoutine->IsProgress = false;
         this->ActivetaskItems->pushBack(i);
     }
+    auto pc = this->occupyRoutine->context;
+    auto oc = this->pendingRoutine->context;
     std::swap(this->occupyRoutine, this->pendingRoutine);
     DebugPrint("%d Routines wake up\n", this->occupyRoutine->id);
-    bSwap(this->pendingRoutine->context, this->occupyRoutine->context);
+#ifdef TEST_SWAP_TIME
+    testSwapTime = get_timestamp();
+#endif
+    bSwap(pc, oc);
+#ifdef TEST_SWAP_TIME
+    auto p = get_timestamp();
+    printf("Routine swap used %lld ns\n", p - testSwapTime);
+    testSwapTime = p;
+#endif
 }
-
 void* RoutineBegin(void* args)
 {
     auto i = (bRoutine*)args;

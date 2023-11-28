@@ -1,9 +1,9 @@
 #include "bRoutineEnv.h"
 
-#include <chrono>
 #include <errno.h>
 #include <stdlib.h>
 #include <string>
+#include <sys/time.h>
 bRoutineEnv::TaskDistributor_t* bRoutineEnv::TaskDistributor_t::New(int size)
 {
     bRoutineEnv::TaskDistributor_t* i = (bRoutineEnv::TaskDistributor_t*)calloc(1, sizeof(bRoutineEnv::TaskDistributor_t));
@@ -82,6 +82,8 @@ struct bRoutineStack* bRoutineEnv::bUnSharedStackPool_t::pop(int level)
     default:
         break;
     }
+    if (i)
+        RoutineNums--;
     //   pthread_mutex_lock(&this->mutex);
     //   if (!this->DoneRoutinesStacks.empty()) {
     //     i = this->DoneRoutinesStacks.front();
@@ -239,6 +241,9 @@ void bRoutineEnv::Deal()
 }
 void bRoutineEnv::bRoutineRecycle(bRoutine*& rt)
 {
+    rt->IsDone = 1;
+    if (rt->IsMain)
+        return;
     if (this->UnSharedStackPool->push(rt->stack) == -1) {
         auto i = bScheduler::get();
         i->IsPendingNeedDelete = 1;
@@ -252,25 +257,48 @@ void bRoutineEnv::bRoutineRecycle(bRoutine*& rt)
     this->RoutinePool->push(rt);
     rt = nullptr;
 }
+long long getMicroseconds()
+{
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    long long microseconds = (long long)tv.tv_sec * 1000000LL + (long long)tv.tv_usec;
+    return microseconds;
+}
+long long getMilliseconds()
+{
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    long long milliseconds = (long long)tv.tv_sec * 1000LL + (long long)tv.tv_usec / 1000LL;
+    return milliseconds;
+}
+
+long long getNanoseconds()
+{
+    struct timespec ts;
+    clock_gettime(CLOCK_REALTIME, &ts);
+    long long nanoseconds = (long long)ts.tv_sec * 1000000000LL + (long long)ts.tv_nsec;
+    return nanoseconds;
+}
+long long getSeconds()
+{
+    time_t currentTime = time(NULL);
+    return (long long)currentTime;
+}
 unsigned long long bRoutineEnv::Timer::getNow_S()
 {
-    return std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now().time_since_epoch())
-        .count();
+    return getSeconds();
 }
 unsigned long long bRoutineEnv::Timer::getNow_Ms()
 {
-    return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch())
-        .count();
+    return getMilliseconds();
 }
 unsigned long long bRoutineEnv::Timer::getNow_Us()
 {
-    return std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now().time_since_epoch())
-        .count();
+    return getMicroseconds();
 }
 unsigned long long bRoutineEnv::Timer::getNow_Ns()
 {
-    return std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now().time_since_epoch())
-        .count();
+    return getNanoseconds();
 }
 // 不能偷main 容易造成内存上下文切换异常
 TaskItem* Try2stealTask(TaskItemsList* activeTask)

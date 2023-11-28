@@ -79,7 +79,9 @@ void bRoutine::yield()
 }
 void bRoutine::deleteSelf()
 {
-    auto Sch = bScheduler::get();
-    Sch->IsPendingNeedDelete = true;
-    Sch->SwapContext();
+    // auto Sch = bScheduler::get();
+    // Sch->IsPendingNeedDelete = true;
+    auto i = bRoutine::getSelf();
+    bRoutineEnv::get()->bRoutineRecycle(i);
+    bScheduler::get()->SwapContext();
 }

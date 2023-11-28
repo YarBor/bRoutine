@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include "common.h"
 typedef unsigned int uint;
+// Stack Size
 enum StackLevel {
     // 128KB
     MiniStack = 1,
