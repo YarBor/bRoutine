@@ -21,5 +21,7 @@ struct bRoutine {
     static bRoutine* getSelf();
     static void yield();
     static void deleteSelf();
+    void disableHook();
+    void enableHook();
 };
 void bRoutineInitProcessNumber(int);

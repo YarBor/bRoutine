@@ -34,6 +34,7 @@ typedef ssize_t (*recv_pfn_t)(int socket, void* buffer, size_t length, int flags
 typedef int (*poll_pfn_t)(struct pollfd fds[], nfds_t nfds, int timeout);
 typedef int (*setsockopt_pfn_t)(int socket, int level, int option_name, const void* option_value, socklen_t option_len);
 typedef int (*fcntl_pfn_t)(int fildes, int cmd, ...);
+typedef int (*__poll_pfn_t)(struct pollfd fds[], nfds_t nfds, int timeout);
 
 #define Hook_Func(X) Hook_##X##_func
 static read_pfn_t Hook_Func(read) = (read_pfn_t)dlsym(RTLD_NEXT, "read");
@@ -49,11 +50,19 @@ static recv_pfn_t Hook_Func(recv) = (recv_pfn_t)dlsym(RTLD_NEXT, "recv");
 static poll_pfn_t Hook_Func(poll) = (poll_pfn_t)dlsym(RTLD_NEXT, "poll");
 static setsockopt_pfn_t Hook_Func(setsockopt) = (setsockopt_pfn_t)dlsym(RTLD_NEXT, "setsockopt");
 static fcntl_pfn_t Hook_Func(fcntl) = (fcntl_pfn_t)dlsym(RTLD_NEXT, "fcntl");
+static __poll_pfn_t Hook_Func(__poll) = (__poll_pfn_t)dlsym(RTLD_NEXT, "__poll");
 
-#define Do_Hook(X)                                      \
-    if (!Hook_Func(X)) {                                \
-        Hook_Func(X) = (X##_pfn_t)dlsym(RTLD_NEXT, #X); \
-    }
+int __poll(struct pollfd fds[], nfds_t nfds, int timeout)
+{
+    return poll(fds, nfds, timeout);
+}
+
+#define Do_Hook(X)                                          \
+    do {                                                    \
+        if (!Hook_Func(X)) {                                \
+            Hook_Func(X) = (X##_pfn_t)dlsym(RTLD_NEXT, #X); \
+        }                                                   \
+    } while (0)
 struct fileDesc {
     int _userFlags;
     struct sockaddr_in _addr;
@@ -75,6 +84,7 @@ static inline bool isEnableHook()
         return i->occupyRoutine->IsEnableHook;
     }
 }
+int poll(struct pollfd fds[], nfds_t nfds, int timeout);
 
 static struct fileDesc* hooksFdSet[HookContralFdNums] = {};
 // fd 是系统级资源 自增 不用加锁
@@ -167,6 +177,7 @@ struct poll_message {
         task->self = bRoutine::getSelf();
         eachFdTask = (TaskItem**)calloc(this->fdSize, sizeof(TaskItem*));
         for (int i = 0; i < this->fdSize; i++) {
+            fds[i].revents = 0;
             eachFdTask[i] = TaskItem::New();
             eachFdTask[i]->bEpollEvent.data.ptr = eachFdTask[i];
             eachFdTask[i]->bEpollEvent.events = poll_to_epoll_events(_pollfds[i].events);
@@ -236,34 +247,7 @@ void* pollCallback(void* args)
     }
     return 0;
 }
-int poll(struct pollfd fds[], nfds_t nfds, int timeout)
-{
-    Do_Hook(poll);
-    if (!isEnableHook() || timeout == 0) {
-        DebugPrint("%d isNotEnableHook\n",bRoutine::getSelf()->id);
-        return Hook_Func(poll)(fds, nfds, timeout);
-    }
-    // 这里是 pm 存的是 fds 的指针
-    // 回调时 操作 pm 中的 fds 的指针
-    // 直接操作fds的数据 不用copy
-    // 是私有栈区
-    poll_message pm(fds, nfds);
-    auto Env = bRoutineEnv::get();
-    Env->Epoll->TimeoutScaner->getBucket(timeout < 0 ? INTMAX_MAX : timeout)->pushBack(pm.task);
-    for (int i = 0; i < pm.fdSize; i++) {
-        epoll_ctl(Env->Epoll->epollFd, EPOLL_CTL_ADD, pm.eachFdTask[i]->epollFd, &pm.eachFdTask[i]->bEpollEvent);
-    }
-    DebugPrint("Routine(%d)poll registe \n", bRoutine::getSelf()->id);
-    bScheduler::get()->SwapContext();
-    DebugPrint("Routine(%d)poll return \n", bRoutine::getSelf()->id);
-    // 返回的时候 通过回调 操作过了 fds参数
-    if (!pm.task->IsTasktimeout)
-        for (int i = 0; i < pm.fdSize; i++) {
-            epoll_ctl(Env->Epoll->epollFd, EPOLL_CTL_DEL, pm.eachFdTask[i]->epollFd, &pm.eachFdTask[i]->bEpollEvent);
-        }
-    auto i = pm._activeFdsNums;
-    return i;
-}
+
 ssize_t read(int fd, void* buf, size_t nbyte)
 {
     Do_Hook(read);
@@ -406,6 +390,7 @@ int fcntl(int fildes, int cmd, ...)
 }
 int socket(int domain, int type, int protocol)
 {
+    DebugPrint("HOOK: socket\n");
     Do_Hook(socket);
 
     if (!isEnableHook()) {
@@ -648,6 +633,35 @@ int setsockopt(int fd, int level, int option_name, const void* option_value, soc
     }
     return Hook_Func(setsockopt)(fd, level, option_name, option_value, option_len);
 }
+int poll(struct pollfd fds[], nfds_t nfds, int timeout)
+{
+    DebugPrint("Hook :%s\n", __func__);
+    Do_Hook(poll);
+    if (!isEnableHook() || timeout == 0) {
+        DebugPrint("%d isNotEnableHook\n", bRoutine::getSelf()->id);
+        return Hook_Func(poll)(fds, nfds, timeout);
+    }
+    // 这里是 pm 存的是 fds 的指针
+    // 回调时 操作 pm 中的 fds 的指针
+    // 直接操作fds的数据 不用copy
+    // 是私有栈区
+    poll_message pm(fds, nfds);
+    auto Env = bRoutineEnv::get();
+    Env->Epoll->TimeoutScaner->getBucket(timeout < 0 ? INTMAX_MAX : timeout)->pushBack(pm.task);
+    for (int i = 0; i < pm.fdSize; i++) {
+        epoll_ctl(Env->Epoll->epollFd, EPOLL_CTL_ADD, pm.eachFdTask[i]->epollFd, &pm.eachFdTask[i]->bEpollEvent);
+    }
+    DebugPrint("Routine(%d)poll registe \n", bRoutine::getSelf()->id);
+    bScheduler::get()->SwapContext();
+    DebugPrint("Routine(%d)poll return \n", bRoutine::getSelf()->id);
+    // 返回的时候 通过回调 操作过了 fds参数
+    if (!pm.task->IsTasktimeout)
+        for (int i = 0; i < pm.fdSize; i++) {
+            epoll_ctl(Env->Epoll->epollFd, EPOLL_CTL_DEL, pm.eachFdTask[i]->epollFd, &pm.eachFdTask[i]->bEpollEvent);
+        }
+    auto i = pm._activeFdsNums;
+    return i;
+}
 // typedef struct tm* (*localtime_r_pfn_t)(const time_t* timep, struct tm* result);
 // typedef void* (*pthread_getspecific_pfn_t)(pthread_key_t key);
 // typedef int (*pthread_setspecific_pfn_t)(pthread_key_t key, const void* value);
@@ -656,10 +670,36 @@ int setsockopt(int fd, int level, int option_name, const void* option_value, soc
 // typedef char* (*getenv_pfn_t)(const char* name);
 // typedef hostent* (*gethostbyname_pfn_t)(const char* name);
 // typedef res_state (*__res_state_pfn_t)();
-// typedef int (*__poll_pfn_t)(struct pollfd fds[], nfds_t nfds, int timeout);
 // static setenv_pfn_t Hook_Func(setenv) = (setenv_pfn_t)dlsym(RTLD_NEXT, "setenv");
 // static unsetenv_pfn_t Hook_Func(unsetenv) = (unsetenv_pfn_t)dlsym(RTLD_NEXT, "unsetenv");
 // static getenv_pfn_t Hook_Func(getenv) = (getenv_pfn_t)dlsym(RTLD_NEXT, "getenv");
 // static __res_state_pfn_t Hook_Func(__res_state) = (__res_state_pfn_t)dlsym(RTLD_NEXT, "__res_state");
 // static gethostbyname_pfn_t Hook_Func(gethostbyname) = (gethostbyname_pfn_t)dlsym(RTLD_NEXT, "gethostbyname");
-// static __poll_pfn_t Hook_Func(__poll) = (__poll_pfn_t)dlsym(RTLD_NEXT, "__poll");
+
+void bRoutine::disableHook()
+{
+    this->IsEnableHook = false;
+}
+// default open
+void bRoutine::enableHook()
+{
+    if (Hook_Func(read) && Hook_Func(write) && Hook_Func(close) && Hook_Func(socket) && Hook_Func(accept) && Hook_Func(connect) && Hook_Func(sendto) && Hook_Func(recvfrom) && Hook_Func(send) && Hook_Func(recv) && Hook_Func(poll) && Hook_Func(setsockopt) && Hook_Func(fcntl) && Hook_Func(__poll)) {
+        DebugPrint("HOOK SUCCESSFUL\n");
+    } else {
+        Do_Hook(read);
+        Do_Hook(write);
+        Do_Hook(close);
+        Do_Hook(socket);
+        Do_Hook(accept);
+        Do_Hook(connect);
+        Do_Hook(sendto);
+        Do_Hook(recvfrom);
+        Do_Hook(send);
+        Do_Hook(recv);
+        Do_Hook(poll);
+        Do_Hook(setsockopt);
+        Do_Hook(fcntl);
+        Do_Hook(__poll);
+    }
+    this->IsEnableHook = true;
+}

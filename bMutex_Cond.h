@@ -17,8 +17,8 @@ struct bMutexCondTaskList {
 struct bMutex {
     std::atomic<int> lockCount;
     bMutexCondTaskList* list;
-    void lock();
-    void unlock();
+    int lock();
+    int unlock();
     bMutex()
     {
         this->list = new bMutexCondTaskList;

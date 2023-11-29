@@ -52,10 +52,10 @@ retry:
     return result;
 }
 
-void bMutex::lock()
+int bMutex::lock()
 {
     int i = 0;
-    bool isSuccessLock;
+    bool isSuccessLock = false;
 retry:
     DebugPrint("%d try Locked\n", bRoutine::getSelf()->id);
     isSuccessLock = this->lockCount.compare_exchange_strong(i, 1);
@@ -71,13 +71,14 @@ retry:
         goto retry;
     }
     DebugPrint("%d Locked\n", bRoutine::getSelf()->id);
+    return isSuccessLock;
 }
-void bMutex::unlock()
+int bMutex::unlock()
 {
     int i = 1;
-    bool isSuccessLock;
-    isSuccessLock = this->lockCount.compare_exchange_strong(i, 0);
-    if (!isSuccessLock) {
+    bool isSuccessUnLock;
+    isSuccessUnLock = this->lockCount.compare_exchange_strong(i, 0);
+    if (!isSuccessUnLock) {
         abort();
     }
     DebugPrint("%d unLocked\n", bRoutine::getSelf()->id);
@@ -88,6 +89,7 @@ void bMutex::unlock()
         delete mt;
         bRoutineEnv::get()->TaskDistributor->AddTask(t);
     }
+    return isSuccessUnLock;
 }
 void bCond::wait(bMutex* lock)
 {

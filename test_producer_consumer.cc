@@ -25,7 +25,8 @@ void* Producer(void* args)
             printf("%s:%d produce task %d\n", __func__, __LINE__, task->id);
         }
         env->cond->signalAll();
-        poll(NULL, 0, 1000);
+        pollfd i = { 0, POLLIN, 0 };
+        poll(&i, 1, 1000);
     }
     return NULL;
 }
