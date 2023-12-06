@@ -7,7 +7,8 @@ unsigned long long testSwapTime;
 uint64_t get_timestamp()
 {
     uint32_t low, high;
-    asm volatile("rdtsc" : "=a" (low), "=d" (high));
+    asm volatile("rdtsc"
+                 : "=a"(low), "=d"(high));
     return (static_cast<uint64_t>(high) << 32) | low;
 }
 #endif
@@ -73,7 +74,6 @@ void* RoutineBegin(void* args)
         i->func(i->args);
         i->IsDone = true;
         i->IsBegin = false;
-        free(i->args);
         i->args = nullptr;
         // 复用
         bRoutineEnv::get()->bRoutineRecycle(i);
@@ -86,6 +86,7 @@ void* ProcessBegin(void* i)
 {
     auto args = (struct threadArgs*)i;
     auto Scheduler = bScheduler::get();
+    DebugPrint("Scheduler Process ID = %d\n", Scheduler->occupyRoutine->id);
     auto Env = bRoutineEnv::get();
     Scheduler->ID = Env->TaskDistributor->registe(Scheduler);
     Scheduler->occupyRoutine->IsProgress = true;

@@ -37,6 +37,7 @@ typedef int (*fcntl_pfn_t)(int fildes, int cmd, ...);
 typedef int (*__poll_pfn_t)(struct pollfd fds[], nfds_t nfds, int timeout);
 
 #define Hook_Func(X) Hook_##X##_func
+static poll_pfn_t Hook_Func(poll) = (poll_pfn_t)dlsym(RTLD_NEXT, "poll");
 static read_pfn_t Hook_Func(read) = (read_pfn_t)dlsym(RTLD_NEXT, "read");
 static write_pfn_t Hook_Func(write) = (write_pfn_t)dlsym(RTLD_NEXT, "write");
 static close_pfn_t Hook_Func(close) = (close_pfn_t)dlsym(RTLD_NEXT, "close");
@@ -47,7 +48,6 @@ static sendto_pfn_t Hook_Func(sendto) = (sendto_pfn_t)dlsym(RTLD_NEXT, "sendto")
 static recvfrom_pfn_t Hook_Func(recvfrom) = (recvfrom_pfn_t)dlsym(RTLD_NEXT, "recvfrom");
 static send_pfn_t Hook_Func(send) = (send_pfn_t)dlsym(RTLD_NEXT, "send");
 static recv_pfn_t Hook_Func(recv) = (recv_pfn_t)dlsym(RTLD_NEXT, "recv");
-static poll_pfn_t Hook_Func(poll) = (poll_pfn_t)dlsym(RTLD_NEXT, "poll");
 static setsockopt_pfn_t Hook_Func(setsockopt) = (setsockopt_pfn_t)dlsym(RTLD_NEXT, "setsockopt");
 static fcntl_pfn_t Hook_Func(fcntl) = (fcntl_pfn_t)dlsym(RTLD_NEXT, "fcntl");
 static __poll_pfn_t Hook_Func(__poll) = (__poll_pfn_t)dlsym(RTLD_NEXT, "__poll");
@@ -57,11 +57,12 @@ int __poll(struct pollfd fds[], nfds_t nfds, int timeout)
     return poll(fds, nfds, timeout);
 }
 
-#define Do_Hook(X)                                          \
-    do {                                                    \
-        if (!Hook_Func(X)) {                                \
-            Hook_Func(X) = (X##_pfn_t)dlsym(RTLD_NEXT, #X); \
-        }                                                   \
+#define Do_Hook(X)                                                                  \
+    do {                                                                            \
+        if (!Hook_Func(X)) {                                                        \
+            Hook_Func(X) = (X##_pfn_t)dlsym(RTLD_NEXT, #X);                         \
+        }                                                                           \
+        DebugPrint("\b\b\b\bbRoutine[%d] (" #X ") HookFunc Call\n", bRoutine::getSelf()->id); \
     } while (0)
 struct fileDesc {
     int _userFlags;
@@ -92,7 +93,6 @@ static struct fileDesc* hooksFdSet[HookContralFdNums] = {};
 static inline fileDesc* allocFileDesc(int fd)
 {
     fileDesc* i = (fileDesc*)calloc(1, sizeof(fileDesc));
-    i->_addr;
     i->_domain = -1;
     i->_userFlags = 0;
     i->_Rtimeout.tv_sec = HookContralFdTimeout_S;
@@ -106,6 +106,7 @@ static inline fileDesc* getFileDesc(int fd)
 {
     if (fd > -1 && fd < HookContralFdNums) {
         auto i = hooksFdSet[fd];
+        return i;
     }
     return nullptr;
 }
@@ -176,7 +177,7 @@ struct poll_message {
         task = TaskItem::New();
         task->self = bRoutine::getSelf();
         eachFdTask = (TaskItem**)calloc(this->fdSize, sizeof(TaskItem*));
-        for (int i = 0; i < this->fdSize; i++) {
+        for (size_t i = 0; i < this->fdSize; i++) {
             fds[i].revents = 0;
             eachFdTask[i] = TaskItem::New();
             eachFdTask[i]->bEpollEvent.data.ptr = eachFdTask[i];
@@ -212,7 +213,7 @@ void* pollTimeout(void* args)
     DebugPrint("pollTimeout\n");
     poll_message* pm = (poll_message*)args;
     auto Env = bRoutineEnv::get();
-    for (int i = 0; i < pm->fdSize; i++) {
+    for (size_t i = 0; i < pm->fdSize; i++) {
         epoll_ctl(Env->Epoll->epollFd, EPOLL_CTL_DEL, pm->eachFdTask[i]->epollFd, &pm->eachFdTask[i]->bEpollEvent);
     }
     return 0;
@@ -222,7 +223,7 @@ void* pollPerpare(void* args, void* epoll_revent)
     poll_message* pm = (poll_message*)args;
     epoll_event* ee = (epoll_event*)epoll_revent;
     auto targetFd = ((TaskItem*)ee->data.ptr)->epollFd;
-    for (auto i = 0; i < pm->fdSize; i++) {
+    for (size_t i = 0; i < pm->fdSize; i++) {
         if (pm->_pollfds[i].fd == targetFd) {
             pm->_pollfds[i].revents = epoll_to_poll_events(ee->events);
             break;
@@ -242,30 +243,66 @@ void* pollCallback(void* args)
     pm->_activeFdsNums2--;
     if (!pm->IsJoinActiveList && pm->_activeFdsNums2 == 0) {
         pm->IsJoinActiveList = 1;
+        auto Env = bRoutineEnv::get();
+        for (size_t i = 0; i < pm->fdSize; i++) {
+            epoll_ctl(Env->Epoll->epollFd, EPOLL_CTL_DEL, pm->eachFdTask[i]->epollFd, &pm->eachFdTask[i]->bEpollEvent);
+        }
         bRoutineEnv::get()->TaskDistributor->AddTask(pm->task);
         pm->task = nullptr;
     }
     return 0;
 }
-
+int poll(struct pollfd fds[], nfds_t nfds, int timeout)
+{
+    Do_Hook(poll);
+    if (!isEnableHook() || timeout == 0) {
+        DebugPrint("%d isNotEnableHook\n", bRoutine::getSelf()->id);
+        return Hook_Func(poll)(fds, nfds, timeout);
+    }
+    // 这里是 pm 存的是 fds 的指针
+    // 回调时 操作 pm 中的 fds 的指针
+    // 直接操作fds的数据 不用copy
+    // 是私有栈区
+    poll_message pm(fds, nfds);
+    auto Env = bRoutineEnv::get();
+    Env->Epoll->TimeoutScaner->getBucket(timeout < 0 ? INTMAX_MAX : timeout)->pushBack(pm.task);
+    for (size_t i = 0; i < pm.fdSize; i++) {
+        epoll_ctl(Env->Epoll->epollFd, EPOLL_CTL_ADD, pm.eachFdTask[i]->epollFd, &pm.eachFdTask[i]->bEpollEvent);
+    }
+    DebugPrint("Routine(%d) poll registe \n", bRoutine::getSelf()->id);
+    bScheduler::get()->SwapContext();
+    DebugPrint("Routine(%d) poll return \n", bRoutine::getSelf()->id);
+    // 返回的时候 通过回调 操作过了 fds参数
+    if (pm.IsJoinActiveList == 0 && !pm.task->IsTasktimeout)
+        for (size_t i = 0; i < pm.fdSize; i++) {
+            epoll_ctl(Env->Epoll->epollFd, EPOLL_CTL_DEL, pm.eachFdTask[i]->epollFd, &pm.eachFdTask[i]->bEpollEvent);
+        }
+    auto i = pm._activeFdsNums;
+    return i;
+}
 ssize_t read(int fd, void* buf, size_t nbyte)
 {
     Do_Hook(read);
     if (!isEnableHook()) {
         return Hook_Func(read)(fd, buf, nbyte);
     }
+    DebugPrint(" %d Do Hook-read\n", bRoutine::getSelf()->id);
     auto i = getFileDesc(fd);
     if (!i || i->_userFlags & O_NONBLOCK) {
+        DebugPrint(!i ? "fd Didnt Regiset return\n" : "fd Set NoBlock return\n");
         return Hook_Func(read)(fd, buf, nbyte);
     }
     int timeout = (i->_Rtimeout.tv_sec * 1000) + (i->_Rtimeout.tv_usec / 1000);
     struct pollfd pf = { 0 };
     pf.fd = fd;
     pf.events = (POLLIN | POLLERR | POLLHUP);
-    int pollret = poll(&pf, 1, timeout);
+
+    while (0 == poll(&pf, 1, timeout))
+        ;
+
     ssize_t readret = Hook_Func(read)(fd, (char*)buf, nbyte);
-    if (readret < 0) {
-        // LOG
+    if (readret <= 0) {
+        DebugPrint(readret == 0 ? "timeout %s\n" : "read SysCall return error:> %s \n", readret == 0 ? "" : strerror(errno));
     }
     return readret;
 }
@@ -279,6 +316,7 @@ ssize_t write(int fd, const void* buf, size_t nbyte)
     auto* lp = getFileDesc(fd);
 
     if (!lp || (O_NONBLOCK & lp->_userFlags)) {
+        DebugPrint(!lp ? "fd Didnt Regiset return\n" : "fd Set NoBlock return\n");
         return Hook_Func(write)(fd, buf, nbyte);
     }
     size_t wrotelen = 0;
@@ -390,7 +428,6 @@ int fcntl(int fildes, int cmd, ...)
 }
 int socket(int domain, int type, int protocol)
 {
-    DebugPrint("HOOK: socket\n");
     Do_Hook(socket);
 
     if (!isEnableHook()) {
@@ -605,12 +642,13 @@ ssize_t recv(int socket, void* buffer, size_t length, int flags)
     struct pollfd pf = { 0 };
     pf.fd = socket;
     pf.events = (POLLIN | POLLERR | POLLHUP);
-
-    int pollret = poll(&pf, 1, timeout);
+    auto pollret = 0;
+    while (0 == (pollret = poll(&pf, 1, timeout)))
+        ;
 
     ssize_t readret = Hook_Func(recv)(socket, buffer, length, flags);
     if (readret < 0) {
-        // co_log_err("CO_ERR: read fd %d ret %ld errno %d poll ret %d timeout %d", socket, readret, errno, pollret,timeout);
+        DebugPrint("Recv False : %s", strerror(errno));
     }
     return readret;
 }
@@ -633,35 +671,7 @@ int setsockopt(int fd, int level, int option_name, const void* option_value, soc
     }
     return Hook_Func(setsockopt)(fd, level, option_name, option_value, option_len);
 }
-int poll(struct pollfd fds[], nfds_t nfds, int timeout)
-{
-    DebugPrint("Hook :%s\n", __func__);
-    Do_Hook(poll);
-    if (!isEnableHook() || timeout == 0) {
-        DebugPrint("%d isNotEnableHook\n", bRoutine::getSelf()->id);
-        return Hook_Func(poll)(fds, nfds, timeout);
-    }
-    // 这里是 pm 存的是 fds 的指针
-    // 回调时 操作 pm 中的 fds 的指针
-    // 直接操作fds的数据 不用copy
-    // 是私有栈区
-    poll_message pm(fds, nfds);
-    auto Env = bRoutineEnv::get();
-    Env->Epoll->TimeoutScaner->getBucket(timeout < 0 ? INTMAX_MAX : timeout)->pushBack(pm.task);
-    for (int i = 0; i < pm.fdSize; i++) {
-        epoll_ctl(Env->Epoll->epollFd, EPOLL_CTL_ADD, pm.eachFdTask[i]->epollFd, &pm.eachFdTask[i]->bEpollEvent);
-    }
-    DebugPrint("Routine(%d)poll registe \n", bRoutine::getSelf()->id);
-    bScheduler::get()->SwapContext();
-    DebugPrint("Routine(%d)poll return \n", bRoutine::getSelf()->id);
-    // 返回的时候 通过回调 操作过了 fds参数
-    if (!pm.task->IsTasktimeout)
-        for (int i = 0; i < pm.fdSize; i++) {
-            epoll_ctl(Env->Epoll->epollFd, EPOLL_CTL_DEL, pm.eachFdTask[i]->epollFd, &pm.eachFdTask[i]->bEpollEvent);
-        }
-    auto i = pm._activeFdsNums;
-    return i;
-}
+
 // typedef struct tm* (*localtime_r_pfn_t)(const time_t* timep, struct tm* result);
 // typedef void* (*pthread_getspecific_pfn_t)(pthread_key_t key);
 // typedef int (*pthread_setspecific_pfn_t)(pthread_key_t key, const void* value);

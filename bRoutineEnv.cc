@@ -221,10 +221,10 @@ void bRoutineEnv::Deal()
             if (((TaskItem*)arr[q].data.ptr)->callbackFuncPtr)
                 ((TaskItem*)arr[q].data.ptr)->callbackFuncPtr(((TaskItem*)arr[q].data.ptr)->callbackFunArgs);
         }
-        for (int q = 0; q < i; q++) {
-            task = (TaskItem*)arr[q].data.ptr;
-            epoll_ctl(this->Epoll->epollFd, EPOLL_CTL_DEL, task->epollFd, &task->bEpollEvent);
-        }
+        // for (int q = 0; q < i; q++) {
+        //     task = (TaskItem*)arr[q].data.ptr;
+        //     epoll_ctl(this->Epoll->epollFd, EPOLL_CTL_DEL, task->epollFd, &task->bEpollEvent);
+        // }
         task = nullptr;
         auto timeoutTaskList = this->Epoll->TimeoutScaner->NewMergeUpdate2Now();
         if (timeoutTaskList->ItemCount.load())
@@ -350,7 +350,6 @@ TaskItem* Try2stealTask(TaskItemsList* activeTask)
 struct TaskItem* bRoutineEnv::stealTaskRoutine(bScheduler* sch)
 {
     auto i = this->TaskDistributor;
-    TaskItem* a;
     for (int id = (sch->ID + 1) % i->size; id != sch->ID; ++id) {
         auto p = Try2stealTask(i->ActiveTasks[id]);
         if (p)
