@@ -1,5 +1,24 @@
 ## bRoutine
 
+Coroutine library based on N:M under Linux x86_64
+
+Use non-preemptive scheduling
+Hooked commonly used network IO system calls based on epoll for event triggering and context switching.
+
+Context switching is a compilation of hand rubs
+Use assembly to save the register state of the current coroutine
+
+It is a symmetric coroutine library. The coroutine stack is private to the coroutine.
+
+Single Epoll instance
+Each physical thread maintains a ready task queue
+When the physical thread's private ready queue is empty, ready tasks from other threads can be stolen.
+
+Timeout events use a single-level time wheel, with 1ms as the minimum timeout unit, and the maximum timeout time is defined through `common.h`
+
+=== 
+## bRoutine
+
 基于Linux x86_64 下的 N:M 的协程库
 
 使用非抢占式调度 
