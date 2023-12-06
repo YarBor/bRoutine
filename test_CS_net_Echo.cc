@@ -38,14 +38,14 @@ void* clientRoutine(void*)
     // 模拟客户端发送消息
 
     char buffer[1024] = { 0 };
-    for (int i = 0, t = rand(); i < t; i++) {
-        std::string msg = "Hello, server!";
+    for (int i = 0, t = rand(); 1; i++,t = rand()) {
+        std::string msg = "Hello, server! -- id:" + std::to_string(t);
         // 向服务器发送消息
-        if (send(clientSocket, msg.c_str(), msg.length(), 0) < 0) {
+        if (write(clientSocket, msg.c_str(), msg.length()) <= 0) {
             std::cerr << "Failed to send message to the server." << std::endl;
             return 0;
         } else {
-            std::cout << "Client send :>" << msg + std::to_string(i) << std::endl;
+            std::cout << "Client send :>" << msg << std::endl;
         }
 
         pollfd fdSet = { clientSocket, POLLIN | POLLHUP | POLLERR | POLLRDHUP, 0 };
@@ -60,6 +60,8 @@ void* clientRoutine(void*)
             perror("Failed to read client message.");
         }
         std::cout << "Client Recv :>" << std::string(buffer, bytesRead) << std::endl;
+        poll(nullptr, 0, 1000);
+        putchar('\n');
     }
     // 关闭客户端套接字
     close(clientSocket);
@@ -100,26 +102,25 @@ void* serverRoutine(void* i)
     mtx.unlock();
 
     std::vector<struct pollfd> pollfds;
-    pollfds.push_back({ serverSocket, POLLIN | POLLOUT | POLLERR, 0 });
+    pollfds.push_back({ serverSocket, POLLIN | POLLERR, 0 });
 
     char buffer[1024] = { 0 };
 
     while (1) {
-        // int n = poll(NULL, 0, 1000);
-        pollfd * pollfdsp = pollfds.data();
+        pollfd* pollfdsp = pollfds.data();
         nfds_t size = (nfds_t)pollfds.size();
-        int n = poll(pollfdsp, size, 1000);
-        for (int i = 0; n && i < pollfds.size(); i++) {
+        int n = poll(pollfdsp, size, 100);
+        int CloseCount = 0;
+        for (size_t i = 0; n && i < pollfds.size(); i++) {
             if (pollfds[i].revents & POLLIN) {
-
                 if (pollfds[i].fd == serverSocket) {
                     int clientSocket = accept(serverSocket, nullptr, nullptr);
+                    std::cout << "clientSocket Link!" << std::endl;
                     if (clientSocket < 0) {
                         std::cerr << "Failed to accept client connection." << std::endl;
                         return 0;
                     }
                     pollfds.push_back({ clientSocket, POLLIN | POLLERR | POLLRDHUP | POLLHUP, 0 });
-
                 } else {
 
                     int clientSocket = pollfds[i].fd;
@@ -139,14 +140,19 @@ void* serverRoutine(void* i)
                         std::cout << "Server Send:> " << std::string(buffer, bytesRead) << std::endl;
                     }
                 }
-            } else if (pollfds[i].revents & POLLERR | POLLRDHUP | POLLHUP) {
+            } else if (pollfds[i].revents & (POLLERR | POLLRDHUP | POLLHUP)) {
                 close(pollfds[i].fd);
-                pollfds.erase(pollfds.begin() + i);
+                CloseCount++;
             } else {
-                perror("undefine behavior");
-                exit(EXIT_FAILURE);
+                continue;
             }
+            n--;
         }
+        if (n) {
+            std::cerr << "undefine behavior" << std::endl;
+            abort();
+        }
+        pollfds.reserve(pollfds.size() - CloseCount);
     }
     return 0;
 }
@@ -163,5 +169,6 @@ int main()
 
     i->Resume();
 
+    bRoutine::deleteSelf();
     return 0;
 }
