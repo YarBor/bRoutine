@@ -1,5 +1,5 @@
-#include "bMutex_Cond.h"
-#include "bRoutine.h"
+#include "../src/bMutex_Cond.h"
+#include "../src/bRoutine.h"
 #include <queue>
 #include <stdio.h>
 #include <stdlib.h>

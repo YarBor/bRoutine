@@ -1,5 +1,5 @@
-#include "bMutex_Cond.h"
-#include "bRoutine.h"
+#include "../src/bMutex_Cond.h"
+#include "../src/bRoutine.h"
 #include <arpa/inet.h>
 #include <cstring>
 #include <iostream>
@@ -60,8 +60,8 @@ void* clientRoutine(void*)
             perror("Failed to read client message.");
         }
         std::cout << "Client Recv :>" << std::string(buffer, bytesRead) << std::endl;
-        poll(nullptr, 0, 1000);
         putchar('\n');
+        poll(nullptr, 0, 1000);
     }
     // 关闭客户端套接字
     close(clientSocket);

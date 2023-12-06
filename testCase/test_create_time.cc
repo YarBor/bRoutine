@@ -1,6 +1,6 @@
 #define _TEST_SWAP_TIEM
-#include "bRoutine.h"
-#include "bRoutineEnv.h"
+#include "../src/bRoutine.h"
+#include "../src/bRoutineEnv.h"
 #include <queue>
 #include <stdio.h>
 #include <stdlib.h>
