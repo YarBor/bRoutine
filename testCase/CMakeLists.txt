@@ -9,17 +9,16 @@ set(BROUTINE_VERSION  0.1)
 enable_language(C ASM)
 
 set(SOURCE_FILES
-../src/bRoutineEnv.cc
-../src/bTask.cc
-../src/bContext.cc
-../src/bMutex_Cond.cc
-../src/bScheduler.cc
-../src/bTimer.cc
-../src/bEpoll.cc
-../src/bRoutine.cc
-../src/bStack.cc
-../src/bSwap.S
-../src/bHook.cc
+    ../src/b_task.cc
+    ../src/b_routine_env.cc
+    ../src/b_context.cc
+    ../src/b_mutex_cond.cc
+    ../src/b_scheduler.cc
+    ../src/b_epoll.cc
+    ../src/b_routine.cc
+    ../src/b_stack.cc
+    ../src/b_swap.S
+    ../src/b_hook.cc
 )
  
 

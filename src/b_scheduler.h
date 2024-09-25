@@ -3,9 +3,9 @@
 #include <pthread.h>
 #include <time.h>
 
-#include "bRoutine.h"
-#include "common.h"
-#include "bStack.h"
+#include "b_routine.h"
+#include "b_common.h"
+#include "b_stack.h"
 
 #define OneMsAsNs 1000000
 #define HangTimeout                                                                                 \

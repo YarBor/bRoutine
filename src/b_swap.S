@@ -1,6 +1,6 @@
 
 .globl bSwap
-#if !defined(__APPLE__)
+#if defined(__x86_64__)
     .type bSwap, @function
 #endif
 
